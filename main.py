@@ -26,7 +26,7 @@ TIME_DELTA = 0
 background_color = (19,19,19)
 #simulation
 has_begin_simulation = False 
-simulation_update_time = 2
+simulation_update_time = 1
 #ui
 clear_button =  pygame_gui.elements.UIButton(relative_rect=pygame.Rect((-120,-100), (100,40)),text='clear',anchors={'right':'right','bottom':'bottom'},manager=GUI_MANAGER)
 begin_simulation_button =  pygame_gui.elements.UIButton(relative_rect=pygame.Rect((-220, -220), (200, 40)),text='begin_simulation',anchors={'right':'right','bottom':'bottom'},manager=GUI_MANAGER)
@@ -117,10 +117,17 @@ def simulate()->None: #supported multithreading!!!
     global has_begin_simulation,cell_positions
     #cells
     neighbours = [None]*8 # create an empty list of lists (total count 8)
+    neighbours_neighbours = [None]*8 # this list contains the neighbours of current neighbour
     print(neighbours) # apparently without this the initialization is not working lol (don't remove this unless you want to break things up.
+    print(neighbours_neighbours)
     neighbour_count = 0
+    neighbours_neighbour_count = 0
+    next_gen_append_pool = []
+    next_gen_remove_pool = []
     while True:
         if has_begin_simulation:
+            next_gen_append_pool = []
+            next_gen_remove_pool = []
             for position in cell_positions:
                 # initialize potential neighbours
                 neighbours[0] = [position[0]-cell_size,position[1]]
@@ -134,12 +141,35 @@ def simulate()->None: #supported multithreading!!!
                 neighbour_count = 0
                 # Any live cell with fewer than two live neighbours dies (referred to as underpopulation).
                 for neighbour in neighbours: # count the number of neighbours
+                    neighbours_neighbours[0] = [neighbour[0]-cell_size,neighbour[1]]
+                    neighbours_neighbours[1] = [neighbour[0]+cell_size,neighbour[1]]
+                    neighbours_neighbours[2] = [neighbour[0],neighbour[1]-cell_size]
+                    neighbours_neighbours[3] = [neighbour[0],neighbour[1]+cell_size]
+                    neighbours_neighbours[4] = [neighbour[0]-cell_size,neighbour[1]-cell_size]
+                    neighbours_neighbours[5] = [neighbour[0]+cell_size,neighbour[1]-cell_size]
+                    neighbours_neighbours[6] = [neighbour[0]-cell_size,neighbour[1]+cell_size]
+                    neighbours_neighbours[7] = [neighbour[0]+cell_size,neighbour[1]+cell_size]
+                    neighbours_neighbour_count = 0
+                    for neighbours_neighbour in neighbours_neighbours:
+                        if neighbours_neighbour in cell_positions:
+                            neighbours_neighbour_count += 1
+                    # Any empty or dead cell can come to life if it has precisely 3 neighbours as if by reproduction.
+                    if neighbours_neighbour_count == 3 and neighbour not in cell_positions:
+                        if neighbour[0] > 0 and neighbour[1] > 0 and neighbour[0] < grid_width-cell_size and neighbour[1] < grid_height-cell_size:
+                            next_gen_append_pool.append(neighbour)
                     if neighbour in cell_positions:
                         neighbour_count += 1 # yay! we have a new neighbour!
-                if neighbour_count < 2 or neighbour_count > 3: # if there are less than two neighbours or grreater than to the current cell it dies.
-                    delete_cell(position)
-                # Any empty or dead cell can come to life if it has precisely 3 neighbours as if by reproduction.
+                if neighbour_count < 2 or neighbour_count > 3: # if there are less than two neighbours or greater than to the current cell it dies.
+                    next_gen_remove_pool.append(position)
+            ##########next generation update##########
+            print(next_gen_remove_pool)
+            print(next_gen_append_pool)
+            for i in next_gen_append_pool:
+                cell_positions.append(i)
+            for i in next_gen_remove_pool:
+                delete_cell(i)
             time.sleep(simulation_update_time)
+           
         else:
             return #close the thread.
 
