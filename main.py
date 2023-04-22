@@ -26,7 +26,7 @@ TIME_DELTA = 0
 background_color = (19,19,19)
 #simulation
 has_begin_simulation = False 
-simulation_update_time = 5
+simulation_update_time = 0.1
 #ui
 clear_button =  pygame_gui.elements.UIButton(relative_rect=pygame.Rect((-120,-100), (100,40)),text='clear',anchors={'right':'right','bottom':'bottom'},manager=GUI_MANAGER)
 begin_simulation_button =  pygame_gui.elements.UIButton(relative_rect=pygame.Rect((-220, -220), (200, 40)),text='begin_simulation',anchors={'right':'right','bottom':'bottom'},manager=GUI_MANAGER)
@@ -160,7 +160,7 @@ def simulate()->None: #supported multithreading!!!
                     if neighbour in cell_positions:
                         neighbour_count += 1 # yay! we have a new neighbour!
                 if neighbour_count < 2 or neighbour_count > 3: # if there are less than two neighbours or greater than to the current cell it dies.
-                    if neighbour not in next_gen_remove_pool:
+                    if position not in next_gen_remove_pool:
                         next_gen_remove_pool.append(position)
             ##########next generation update##########
             for i in next_gen_append_pool:
