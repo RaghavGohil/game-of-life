@@ -12,7 +12,7 @@ WINDOW_WIDTH = 600
 WINDOW_HEIGHT = 600
 WINDOW_SIZE = (WINDOW_WIDTH,WINDOW_HEIGHT)
 WINDOW = pygame.display.set_mode(WINDOW_SIZE)
-TITLE = "John Conway's Game Of Life Editor"
+TITLE = "John Conway's Game Of Life Simulator"
 pygame.display.set_caption(TITLE)
 CLOCK = pygame.time.Clock()
 RUNNING = True
@@ -43,7 +43,7 @@ camera_prev_pos = [-grid_width/2,-grid_height/2]
 camera_pos = [-grid_width/2,-grid_height/2] # go to the center of the grid 
 clicked_pos = [0,0]
 # cell is the actual cell which will perform different actions
-can_draw_cells = True
+can_edit_cells = True
 cell_size = 20
 cell_color = (196,196,196)
 cell_positions = []
@@ -86,6 +86,11 @@ def draw_cell(which:int,position:tuple)->None:
     if which == 1:
         pygame.draw.rect(WINDOW,cell_color,(position[0],position[1],cell_size,cell_size))
        
+def delete_cell(position:list)->None:
+    global cell_positions
+    pop_index = cell_positions.index(position)
+    cell_positions.pop(pop_index)
+
 # this function renders all the different types of cells
 def render_cells(mouse_press:tuple,mouse_pos:tuple)->None:
     global cell_positions
@@ -102,35 +107,41 @@ def render_cells(mouse_press:tuple,mouse_pos:tuple)->None:
                 selector_position[1] = y*cell_size
     # if mouse is pressed, place a cell, and don't place a cell if it is already present
     if mouse_press[0] and selector_position not in cell_positions:
-        if not cursor_on_button and can_draw_cells:
+        if not cursor_on_button and can_edit_cells:
             cell_positions.append(selector_position[:])
     elif mouse_press[2] and selector_position in cell_positions:
-        pop_index = cell_positions.index(selector_position)
-        cell_positions.pop(pop_index)
-                
+        if not cursor_on_button and can_edit_cells:
+            delete_cell(selector_position)
+
 def simulate()->None: #supported multithreading!!!
-    global has_begin_simulation
+    global has_begin_simulation,cell_positions
     #cells
-    left = [0,0]
-    right = [0,0]
-    top = [0,0]
-    bottom = [0,0]
-    top-left = [0,0]
-    top-right = [0,0]
-    bottom-left = [0,0]
-    bottom-right = [0,0]
+    neighbours = [None]*8 # create an empty list of lists (total count 8)
+    print(neighbours) # apparently without this the initialization is not working lol (don't remove this unless you want to break things up.
+    neighbour_count = 0
     while True:
         if has_begin_simulation:
             for position in cell_positions:
-                #calculate the neighbours
-                left = [position[0]-cell_size,position[1]]
-                right = [position[0]+cell_size,position[1]]
-                bottom = []
+                # initialize potential neighbours
+                neighbours[0] = [position[0]-cell_size,position[1]]
+                neighbours[1] = [position[0]+cell_size,position[1]]
+                neighbours[2] = [position[0],position[1]-cell_size]
+                neighbours[3] = [position[0],position[1]+cell_size]
+                neighbours[4] = [position[0]-cell_size,position[1]-cell_size]
+                neighbours[5] = [position[0]+cell_size,position[1]-cell_size]
+                neighbours[6] = [position[0]-cell_size,position[1]+cell_size]
+                neighbours[7] = [position[0]+cell_size,position[1]+cell_size]
+                neighbour_count = 0
+                # Any live cell with fewer than two live neighbours dies (referred to as underpopulation).
+                for neighbour in neighbours: # count the number of neighbours
+                    if neighbour in cell_positions:
+                        neighbour_count += 1 # yay! we have a new neighbour!
+                if neighbour_count < 2 or neighbour_count > 3: # if there are less than two neighbours or grreater than to the current cell it dies.
+                    delete_cell(position)
+                # Any empty or dead cell can come to life if it has precisely 3 neighbours as if by reproduction.
             time.sleep(simulation_update_time)
-
-# simulation
-simulation_thread = threading.Thread(target=simulate)
-simulation_thread.start()
+        else:
+            return #close the thread.
 
 # game loop
 while RUNNING:
@@ -144,8 +155,9 @@ while RUNNING:
     #event handling (game+ui)
     for e in events:
         if e.type == pygame.QUIT:
+            has_begin_simulation = False
             RUNNING = False
-        if e.type == pygame_gui.UI_BUTTON_ON_HOVERED and not has_begin_simulation: #to check if we are not running the simulation so that the cells can be drawn properly (related to can_draw_cells)
+        if e.type == pygame_gui.UI_BUTTON_ON_HOVERED:
             cursor_on_button = True 
         if e.type == pygame_gui.UI_BUTTON_ON_UNHOVERED:
             cursor_on_button = False 
@@ -153,16 +165,19 @@ while RUNNING:
             if e.ui_element == clear_button:
                 cell_positions.clear()
             if e.ui_element == begin_simulation_button:
+                # simulation
+                simulation_thread = threading.Thread(target=simulate)
+                simulation_thread.start()
                 has_begin_simulation = True
                 begin_simulation_button.disable()
                 stop_simulation_button.enable()
                 clear_button.disable()
-                can_draw_cells = False
+                can_edit_cells = False
             if e.ui_element == stop_simulation_button:
                 begin_simulation_button.enable()
                 stop_simulation_button.disable()
                 clear_button.enable()
-                can_draw_cells = True
+                can_edit_cells = True
                 has_begin_simulation = False
         GUI_MANAGER.process_events(e)
     # update the background
@@ -179,3 +194,4 @@ while RUNNING:
     pygame.display.flip()
 
 pygame.quit()
+exit()
