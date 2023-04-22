@@ -1,38 +1,55 @@
-#imports
+# this project needs performance updates because I suck at programming shi* (also I am too lazy for encapsultion)
+# imports
+import threading # for the simulation
 import pygame
+import time
+import pygame_gui
 from math_functions import *
 
 # pygame settings
 pygame.init()
-WINDOW_WIDTH = 1000
-WINDOW_HEIGHT = 1000
-WINDOW = pygame.display.set_mode((WINDOW_WIDTH,WINDOW_HEIGHT))
+WINDOW_WIDTH = 600
+WINDOW_HEIGHT = 600
+WINDOW_SIZE = (WINDOW_WIDTH,WINDOW_HEIGHT)
+WINDOW = pygame.display.set_mode(WINDOW_SIZE)
 TITLE = "John Conway's Game Of Life Editor"
 pygame.display.set_caption(TITLE)
 CLOCK = pygame.time.Clock()
 RUNNING = True
 FPS = 144 
 
+# gui settings
+GUI_MANAGER = pygame_gui.UIManager(WINDOW_SIZE)
+TIME_DELTA = 0
+
 # game settings
 background_color = (19,19,19)
+#simulation
+has_begin_simulation = False 
+simulation_update_time = 2
+#ui
+clear_button =  pygame_gui.elements.UIButton(relative_rect=pygame.Rect((-120,-100), (100,40)),text='clear',anchors={'right':'right','bottom':'bottom'},manager=GUI_MANAGER)
+begin_simulation_button =  pygame_gui.elements.UIButton(relative_rect=pygame.Rect((-220, -220), (200, 40)),text='begin_simulation',anchors={'right':'right','bottom':'bottom'},manager=GUI_MANAGER)
+stop_simulation_button =  pygame_gui.elements.UIButton(relative_rect=pygame.Rect((-220, -160), (200, 40)),text='stop_simulation',anchors={'right':'right','bottom':'bottom'},manager=GUI_MANAGER)
+stop_simulation_button.disable()
+cursor_on_button = False
 #grid
 grid_width = 2000
 grid_height = 2000 
 grid_color = (71,71,71)
 grid_line_width = 1
 #camera
-camera_prev_pos = [0,0]
-camera_pos = [-grid_width/2,-grid_height/2] # first two are the current pos and the other two are for calculating 
+camera_prev_pos = [-grid_width/2,-grid_height/2]
+camera_pos = [-grid_width/2,-grid_height/2] # go to the center of the grid 
+clicked_pos = [0,0]
 # cell is the actual cell which will perform different actions
+can_draw_cells = True
 cell_size = 20
 cell_color = (196,196,196)
 cell_positions = []
 # selector the cursor pointing to a cell which will help in the placement of the cell
 selector_color = (222,187,133)
 selector_position = [0,0]
-
-# other variables
-clicked_pos = [0,0]
 
 def move_camera(events:pygame.event.Event,keys:tuple,mouse_press:tuple)->None:
     global cell_positions,camera_pos,clicked_pos,camera_prev_pos,cell_size
@@ -85,21 +102,69 @@ def render_cells(mouse_press:tuple,mouse_pos:tuple)->None:
                 selector_position[1] = y*cell_size
     # if mouse is pressed, place a cell, and don't place a cell if it is already present
     if mouse_press[0] and selector_position not in cell_positions:
-        cell_positions.append(selector_position[:])
+        if not cursor_on_button and can_draw_cells:
+            cell_positions.append(selector_position[:])
     elif mouse_press[2] and selector_position in cell_positions:
         pop_index = cell_positions.index(selector_position)
         cell_positions.pop(pop_index)
                 
+def simulate()->None: #supported multithreading!!!
+    global has_begin_simulation
+    #cells
+    left = [0,0]
+    right = [0,0]
+    top = [0,0]
+    bottom = [0,0]
+    top-left = [0,0]
+    top-right = [0,0]
+    bottom-left = [0,0]
+    bottom-right = [0,0]
+    while True:
+        if has_begin_simulation:
+            for position in cell_positions:
+                #calculate the neighbours
+                left = [position[0]-cell_size,position[1]]
+                right = [position[0]+cell_size,position[1]]
+                bottom = []
+            time.sleep(simulation_update_time)
+
+# simulation
+simulation_thread = threading.Thread(target=simulate)
+simulation_thread.start()
+
 # game loop
 while RUNNING:
+    # for deltatime calcuation
+    TIME_DELTA = CLOCK.tick(FPS)
     # handle the events
     mouse_pos = pygame.mouse.get_pos()
     mouse_press = pygame.mouse.get_pressed()
     keys = pygame.key.get_pressed()
     events = pygame.event.get()
+    #event handling (game+ui)
     for e in events:
         if e.type == pygame.QUIT:
             RUNNING = False
+        if e.type == pygame_gui.UI_BUTTON_ON_HOVERED and not has_begin_simulation: #to check if we are not running the simulation so that the cells can be drawn properly (related to can_draw_cells)
+            cursor_on_button = True 
+        if e.type == pygame_gui.UI_BUTTON_ON_UNHOVERED:
+            cursor_on_button = False 
+        if e.type == pygame_gui.UI_BUTTON_PRESSED:
+            if e.ui_element == clear_button:
+                cell_positions.clear()
+            if e.ui_element == begin_simulation_button:
+                has_begin_simulation = True
+                begin_simulation_button.disable()
+                stop_simulation_button.enable()
+                clear_button.disable()
+                can_draw_cells = False
+            if e.ui_element == stop_simulation_button:
+                begin_simulation_button.enable()
+                stop_simulation_button.disable()
+                clear_button.enable()
+                can_draw_cells = True
+                has_begin_simulation = False
+        GUI_MANAGER.process_events(e)
     # update the background
     WINDOW.fill(background_color)
     # camera movement
@@ -107,9 +172,10 @@ while RUNNING:
     #all the rendering goes here
     render_grid()
     render_cells(mouse_press,mouse_pos)
+    # gui
+    GUI_MANAGER.update(TIME_DELTA)
+    GUI_MANAGER.draw_ui(WINDOW)
     # update the frame
     pygame.display.flip()
-    # for deltatime calcuation
-    CLOCK.tick(FPS)
 
 pygame.quit()
