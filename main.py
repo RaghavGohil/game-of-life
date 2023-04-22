@@ -26,7 +26,7 @@ TIME_DELTA = 0
 background_color = (19,19,19)
 #simulation
 has_begin_simulation = False 
-simulation_update_time = 1
+simulation_update_time = 5
 #ui
 clear_button =  pygame_gui.elements.UIButton(relative_rect=pygame.Rect((-120,-100), (100,40)),text='clear',anchors={'right':'right','bottom':'bottom'},manager=GUI_MANAGER)
 begin_simulation_button =  pygame_gui.elements.UIButton(relative_rect=pygame.Rect((-220, -220), (200, 40)),text='begin_simulation',anchors={'right':'right','bottom':'bottom'},manager=GUI_MANAGER)
@@ -47,6 +47,8 @@ can_edit_cells = True
 cell_size = 20
 cell_color = (196,196,196)
 cell_positions = []
+next_gen_append_pool = []
+next_gen_remove_pool = []
 # selector the cursor pointing to a cell which will help in the placement of the cell
 selector_color = (222,187,133)
 selector_position = [0,0]
@@ -88,8 +90,9 @@ def draw_cell(which:int,position:tuple)->None:
        
 def delete_cell(position:list)->None:
     global cell_positions
-    pop_index = cell_positions.index(position)
-    cell_positions.pop(pop_index)
+    if position in cell_positions:
+        pop_index = cell_positions.index(position)
+        cell_positions.pop(pop_index)
 
 # this function renders all the different types of cells
 def render_cells(mouse_press:tuple,mouse_pos:tuple)->None:
@@ -114,7 +117,7 @@ def render_cells(mouse_press:tuple,mouse_pos:tuple)->None:
             delete_cell(selector_position)
 
 def simulate()->None: #supported multithreading!!!
-    global has_begin_simulation,cell_positions
+    global has_begin_simulation,cell_positions,next_gen_append_pool,next_gen_remove_pool
     #cells
     neighbours = [None]*8 # create an empty list of lists (total count 8)
     neighbours_neighbours = [None]*8 # this list contains the neighbours of current neighbour
@@ -122,12 +125,8 @@ def simulate()->None: #supported multithreading!!!
     print(neighbours_neighbours)
     neighbour_count = 0
     neighbours_neighbour_count = 0
-    next_gen_append_pool = []
-    next_gen_remove_pool = []
     while True:
         if has_begin_simulation:
-            next_gen_append_pool = []
-            next_gen_remove_pool = []
             for position in cell_positions:
                 # initialize potential neighbours
                 neighbours[0] = [position[0]-cell_size,position[1]]
@@ -156,18 +155,20 @@ def simulate()->None: #supported multithreading!!!
                     # Any empty or dead cell can come to life if it has precisely 3 neighbours as if by reproduction.
                     if neighbours_neighbour_count == 3 and neighbour not in cell_positions:
                         if neighbour[0] > 0 and neighbour[1] > 0 and neighbour[0] < grid_width-cell_size and neighbour[1] < grid_height-cell_size:
-                            next_gen_append_pool.append(neighbour)
+                            if neighbour not in next_gen_append_pool:
+                                next_gen_append_pool.append(neighbour)
                     if neighbour in cell_positions:
                         neighbour_count += 1 # yay! we have a new neighbour!
                 if neighbour_count < 2 or neighbour_count > 3: # if there are less than two neighbours or greater than to the current cell it dies.
-                    next_gen_remove_pool.append(position)
+                    if neighbour not in next_gen_remove_pool:
+                        next_gen_remove_pool.append(position)
             ##########next generation update##########
-            print(next_gen_remove_pool)
-            print(next_gen_append_pool)
             for i in next_gen_append_pool:
                 cell_positions.append(i)
             for i in next_gen_remove_pool:
                 delete_cell(i)
+            next_gen_append_pool.clear()
+            next_gen_remove_pool.clear()
             time.sleep(simulation_update_time)
            
         else:
@@ -194,6 +195,8 @@ while RUNNING:
         if e.type == pygame_gui.UI_BUTTON_PRESSED:
             if e.ui_element == clear_button:
                 cell_positions.clear()
+                next_gen_append_pool.clear()
+                next_gen_remove_pool.clear()
             if e.ui_element == begin_simulation_button:
                 # simulation
                 simulation_thread = threading.Thread(target=simulate)
